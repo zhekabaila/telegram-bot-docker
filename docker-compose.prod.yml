@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: telegram_stack_postgres_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_DB: db_telegram_bot
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d db_telegram_bot']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../telegram-ai-bot
+      dockerfile: ../telegram-bot-docker/Dockerfile.backend.prod
+    container_name: telegram_stack_backend_prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.backend.prod
+    environment:
+      DATABASE_URL: postgresql://postgres:change_me@postgres:5432/db_telegram_bot?schema=public
+      WEBHOOK_PORT: 3000
+      NODE_ENV: production
+    command: sh -c "npx prisma migrate deploy && npm start"
+    ports:
+      - '5505:3000'
+
+  frontend:
+    build:
+      context: ../order-bot-dashboard
+      dockerfile: ../telegram-bot-docker/Dockerfile.frontend.prod
+    container_name: telegram_stack_frontend_prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    env_file:
+      - .env.frontend.prod
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3000:3000'
+
+volumes:
+  postgres_data_prod:

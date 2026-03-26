@@ -1,2 +1,4 @@
 .env.backend
 .env.frontend
+.env.backend.prod
+.env.frontend.prod
