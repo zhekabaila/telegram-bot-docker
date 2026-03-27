@@ -184,3 +184,54 @@ Atau untuk mode production:
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 ```
+
+## 5. Reload Docker Saat File .env atau Kode Berubah
+
+Bagian ini khusus untuk reload service `backend` atau `frontend` tanpa harus mematikan semua service.
+
+### A. Development: jika ubah kode
+
+Pada mode development, source code di-mount sebagai volume, jadi biasanya perubahan kode otomatis terbaca oleh `npm run dev`.
+
+Jika perubahan tidak terbaca, restart service yang dibutuhkan:
+
+```bash
+docker compose restart backend
+docker compose restart frontend
+```
+
+### B. Development: jika ubah file .env
+
+Perubahan `.env.backend` atau `.env.frontend` butuh recreate container agar env baru ter-load:
+
+```bash
+docker compose up -d --force-recreate backend
+docker compose up -d --force-recreate frontend
+```
+
+Jika ada perubahan dependency atau Dockerfile, gunakan build ulang service terkait:
+
+```bash
+docker compose up -d --build backend
+docker compose up -d --build frontend
+```
+
+### C. Production: jika ubah kode
+
+Untuk production, perubahan kode membutuhkan rebuild image lalu recreate service:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build backend
+docker compose -f docker-compose.prod.yml up -d --build frontend
+```
+
+### D. Production: jika ubah file .env
+
+Perubahan `.env.backend.prod` atau `.env.frontend.prod` minimal perlu recreate container:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate backend
+docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
+```
+
+Jika sekaligus ada perubahan kode/dependency, gunakan opsi `--build` juga.
