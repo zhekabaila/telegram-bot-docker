@@ -30,7 +30,7 @@ services:
       DATABASE_URL: postgresql://postgres:change_me@postgres:5432/db_telegram_bot?schema=public
       WEBHOOK_PORT: 3000
       NODE_ENV: production
-    command: sh -c "npx prisma migrate deploy && npm start"
+    command: sh -c "cd /app && npx prisma db push --schema=./prisma/schema.prisma && npm start"
     ports:
       - '5505:3000'
 
