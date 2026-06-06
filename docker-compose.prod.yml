@@ -14,6 +14,34 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  redis:
+    image: redis:7-alpine
+    container_name: telegram_stack_redis_prod
+    restart: unless-stopped
+    volumes:
+      - redis_data_prod:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   backend:
     build:
@@ -24,15 +52,27 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - .env.backend.prod
     environment:
       DATABASE_URL: postgresql://postgres:change_me@postgres:5432/db_telegram_bot?schema=public
       WEBHOOK_PORT: 3000
+      PORT: 5505
+      REDIS_URL: redis://redis:6379
       NODE_ENV: production
     command: sh -c "cd /app && npx prisma db push --schema=./prisma/schema.prisma && npm start"
     ports:
-      - '5505:3000'
+      - '5505:5505'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
   frontend:
     build:
@@ -48,6 +88,15 @@ services:
       NODE_ENV: production
     ports:
       - '3000:3000'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
 
 volumes:
   postgres_data_prod:
+  redis_data_prod:
