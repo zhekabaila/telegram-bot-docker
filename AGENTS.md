@@ -41,7 +41,7 @@ Never mix dev and prod compose files.
 
 | Service | Container | Host |
 |---|---|---|
-| Frontend | 3000 | 3000 |
+| Frontend | 5506 | 5506 |
 | Backend API | 5505 | 5505 |
 | PostgreSQL | 5432 | 5284 |
 | Redis | 6379 | 6379 (dev only) |
