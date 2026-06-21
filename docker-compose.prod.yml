@@ -78,6 +78,9 @@ services:
     build:
       context: ../order-bot-dashboard
       dockerfile: ../telegram-bot-docker/Dockerfile.frontend.prod
+      args:
+        - NEXT_PUBLIC_API_URL=https://sellgram-api.coreapps.web.id
+        - NEXT_PUBLIC_SITE_URL=https://sellgram.coreapps.web.id
     container_name: telegram_stack_frontend_prod
     restart: unless-stopped
     depends_on:
