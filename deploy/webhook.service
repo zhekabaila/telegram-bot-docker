@@ -1,0 +1,18 @@
+[Unit]
+Description=adnanh webhook receiver - deploy Sellgram lxc-6 (Fase 6)
+Documentation=https://github.com/adnanh/webhook
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/deploy
+ExecStart=/usr/local/bin/webhook -hooks /etc/webhook/hooks.json -port 9000 -verbose -hotreload
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

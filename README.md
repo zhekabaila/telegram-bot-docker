@@ -24,6 +24,11 @@ lxc6-app/                        # stack aplikasi (Fase 1)
 scripts/
   backup-db.sh
   restore-db.sh
+deploy/                          # CI/CD Fase 6: webhook + skrip deploy di lxc-6
+  deploy.sh                      # flock, pull, up -d, health 40 s, rollback
+  hooks.json.example             # dasar /etc/webhook/hooks.json (token diganti di server)
+  webhook.service                # unit systemd adnanh/webhook, port 9000
+  README.md                      # alur + pemasangan + uji rollback
 legacy/                          # arsip stack lama (compose prod, Dockerfile, docs, skill VPS)
 lxc7-monitoring/                 # stack monitoring lxc-7 (Fase 5)
   docker-compose.yml             # prometheus, grafana, portainer, pve-exporter, blackbox
@@ -44,6 +49,7 @@ lxc6-app/docker-compose.agents.yml  # node-exporter, cAdvisor, portainer-agent (
 | postgres | — | **tidak dipublish** (hanya network internal) |
 | redis | — | **tidak dipublish** (hanya network internal) |
 | cAdvisor (agent) | 8082 | Fase 5, di lxc-6 |
+| webhook deploy | 9000 | Fase 6, adnanh/webhook, di lxc-6 (hanya lewat Cloudflare Tunnel) |
 | portainer-agent | 9001 | Fase 5, di lxc-6 |
 | node-exporter | 9100 | Fase 5, `network_mode: host` di lxc-6 |
 | Grafana (lxc-7) | 3000 | Fase 5 |
@@ -77,9 +83,8 @@ kredensial pihak ketiga di `.env.backend` **langsung di server** (jangan pernah 
 docker compose up -d postgres redis
 docker compose ps            # tunggu sampai healthy
 
-# 2) build satu per satu (RAM lxc-6 terbatas — T10)
-docker compose build backend
-docker compose build frontend
+# 2) image aplikasi di-pull dari GHCR (Fase 6 — tidak ada build di lxc-6)
+docker compose pull backend frontend
 
 # 3) aplikasi
 docker compose up -d backend frontend
@@ -124,9 +129,37 @@ Kembali ke bridge: `docker compose up -d` (tanpa overlay).
 - **T12**: tidak ada `command:` di backend — Dockerfile BE sudah menjalankan
   `prisma db push` lalu `npm start`.
 - **T4**: Evolution di-pin ke `v2.3.7`, bukan `latest`.
-- **T2**: build memakai Dockerfile milik repo aplikasi, bukan file di `legacy/`.
-- `NEXT_PUBLIC_*` tertanam saat build — mengubahnya berarti rebuild image frontend.
+- **T2**: image dibangun GitHub Actions dari `Dockerfile` milik repo aplikasi, bukan file di
+  `legacy/` (sejak Fase 6 tidak ada `build:` di compose).
+- `NEXT_PUBLIC_*` tertanam saat build — nilainya jadi `build-args` di workflow FE, jadi
+  mengubahnya berarti push + rebuild image (bukan edit `.env`).
 - Password harus alfanumerik/hex karena dipakai di dalam URL koneksi.
+
+## CI/CD — image GHCR + webhook (Fase 6)
+
+`backend` dan `frontend` memakai image jadi, bukan `build:`:
+
+```yaml
+image: ghcr.io/tefa-stemanika/sellgram-be:${BE_TAG:-latest}
+image: ghcr.io/tefa-stemanika/sellgram-fe:${FE_TAG:-latest}
+```
+
+`BE_TAG`/`FE_TAG` ada di `.env` dan **diisi otomatis** oleh `/opt/deploy/deploy.sh`
+(`sha-<commit>`). Alur: push ke `main` → Actions build `linux/amd64` + push GHCR →
+POST webhook lxc-6 → `pull` + `up -d` + health check 40 s → `DEPLOY_OK`, atau rollback
+ke tag sebelumnya + `DEPLOY_FAILED`.
+
+Pemasangan webhook di lxc-6 dan uji rollback: lihat **`deploy/README.md`**.
+
+Deploy manual:
+
+```bash
+sudo -u deploy /opt/deploy/deploy.sh fe          # tag `latest`
+sudo -u deploy /opt/deploy/deploy.sh be <sha>    # tag `sha-<sha>`
+```
+
+Rollback = jalankan `deploy.sh` dengan tag lama, atau tulis `FE_TAG`/`BE_TAG` di `.env`
+lalu `docker compose up -d <svc>`.
 
 ## Backup / restore
 
@@ -179,3 +212,5 @@ Token Proxmox: user `monitor@pve` + role `PVEAuditor` + API token `prom`
 
 - Fase 1 (repo ini) — selesai: compose lxc-6, initdb, env contoh, script, `.gitignore`.
 - Fase 5 — selesai: `lxc7-monitoring/` + `lxc6-app/docker-compose.agents.yml`.
+- Fase 6 — selesai: image GHCR + `deploy/` (webhook adnanh, `deploy.sh` dengan flock,
+  health check 40 s, rollback), compose lxc-6 tanpa `build:`.

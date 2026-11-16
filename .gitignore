@@ -6,6 +6,10 @@
 # Kredensial pve-exporter (Fase 5)
 pve.yml
 
+# Konfigurasi webhook asli (token di dalamnya) — hanya ada di server (Fase 6)
+deploy/hooks.json
+deploy/state/
+
 # Password admin Portainer (Fase 5) — hanya ada di server
 lxc7-monitoring/portainer/
 

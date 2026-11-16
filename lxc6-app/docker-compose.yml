@@ -1,8 +1,13 @@
 # Stack aplikasi Sellgram di lxc-6 (10.0.2.25)
-# Fase 1 — SELLGRAM-LXC-DOCKER-MIGRATION
+# Fase 1 — SELLGRAM-LXC-DOCKER-MIGRATION | Fase 6 — image dari GHCR
 #
 # Jalankan dari direktori ini:  docker compose up -d
 # Nilai password diambil dari .env (lihat .env.example).
+#
+# Backend & frontend TIDAK di-build di sini lagi (Fase 6): image
+# `ghcr.io/tefa-stemanika/sellgram-{be,fe}` dibangun GitHub Actions lalu di-pull.
+# Tag aktif disimpan di `.env` (BE_TAG / FE_TAG) dan diperbarui otomatis oleh
+# `/opt/deploy/deploy.sh`. Deploy manual = `docker compose pull backend && up -d`.
 #
 # Catatan port (T11): evolution 8080, backend 5505, frontend 3000.
 # cAdvisor (Fase 5) memakai 8082 di host agar tidak bentrok dengan Evolution.
@@ -58,10 +63,9 @@ services:
     networks: [internal]
 
   backend:
-    build:
-      context: ${SELLGRAM_BE_CONTEXT:-../../sellgram-be}
-      dockerfile: Dockerfile
-    image: sellgram-be:local
+    # Fase 6: image dibangun GitHub Actions lalu di-pull dari GHCR (tidak ada build di lxc-6).
+    # Tag diisi `/opt/deploy/deploy.sh` ke `.env` (BE_TAG=sha-<commit>); default `latest`.
+    image: ghcr.io/tefa-stemanika/sellgram-be:${BE_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
@@ -81,14 +85,9 @@ services:
     networks: [internal]
 
   frontend:
-    build:
-      context: ${SELLGRAM_FE_CONTEXT:-../../sellgram-fe}
-      dockerfile: Dockerfile
-      args:
-        # NEXT_PUBLIC_* tertanam saat build: ubah nilai = wajib rebuild image
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://sellgram-api.coreapps.web.id}
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://sellgram.coreapps.web.id}
-    image: sellgram-fe:local
+    # Fase 6: image dibangun GitHub Actions (NEXT_PUBLIC_* = build-arg di workflow).
+    # Tag diisi `/opt/deploy/deploy.sh` ke `.env` (FE_TAG=sha-<commit>); default `latest`.
+    image: ghcr.io/tefa-stemanika/sellgram-fe:${FE_TAG:-latest}
     restart: unless-stopped
     depends_on: [backend]
     environment:
