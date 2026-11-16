@@ -162,6 +162,13 @@ Versi image di-pin (bukan `latest`): node-exporter `v1.12.1`, cAdvisor `v0.60.6`
 portainer-ce/agent `2.45.3`, prometheus `v3.15.1`, grafana `13.3.0`,
 pve-exporter `3.11.0`, blackbox `v0.29.1`.
 
+Admin Portainer dibuat saat start dari `portainer/admin_password` (mode 600, tidak di git),
+lewat flag `--admin-password-file`. Tanpa itu Portainer masuk mode *timeout* bila admin tidak
+dibuat dalam 5 menit. Ganti password lewat **My account** setelah login. Agent lxc-6
+didaftarkan sebagai environment `https://10.0.2.25:9001` (TLS + skip verify, cert agent self-signed).
+
+Grafana dan Portainer **wajib** di balik Cloudflare Access sebelum hostname diarahkan publik.
+
 Dashboard (provisioning, folder **Sellgram**): 1860 Node Exporter Full,
 10347 Proxmox via Prometheus, 14282 cAdvisor exporter, 7587 Blackbox Exporter.
 
