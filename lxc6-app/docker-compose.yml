@@ -1,0 +1,124 @@
+# Stack aplikasi Sellgram di lxc-6 (10.0.2.25)
+# Fase 1 — SELLGRAM-LXC-DOCKER-MIGRATION
+#
+# Jalankan dari direktori ini:  docker compose up -d
+# Nilai password diambil dari .env (lihat .env.example).
+#
+# Catatan port (T11): evolution 8080, backend 5505, frontend 3000.
+# cAdvisor (Fase 5) memakai 8082 di host agar tidak bentrok dengan Evolution.
+
+name: sellgram
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      # Dibaca oleh initdb/01-init.sh (hanya jalan saat data dir kosong)
+      SELLGRAM_APP_PASSWORD: ${SELLGRAM_APP_PASSWORD}
+      EVOLUTION_DB_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 256m
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    # BullMQ mensyaratkan noeviction (T5). AOF aktif agar job tidak hilang saat restart.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - noeviction
+      - --appendonly
+      - "yes"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 160m
+    networks: [internal]
+
+  backend:
+    build:
+      context: ${SELLGRAM_BE_CONTEXT:-../../sellgram-be}
+      dockerfile: Dockerfile
+    image: sellgram-be:local
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    env_file: .env.backend
+    environment:
+      NODE_ENV: production
+      PORT: "5505"
+      WEBHOOK_PORT: "5505"
+      NODE_OPTIONS: --max-old-space-size=320
+      DATABASE_URL: postgresql://sellgram_app:${SELLGRAM_APP_PASSWORD}@postgres:5432/db_telegram_bot?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      # Di-override bila Evolution dipindah ke network_mode host (lihat docker-compose.evolution-host.yml)
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-http://evolution:8080}
+    ports: ["5505:5505"]
+    mem_limit: 448m
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ${SELLGRAM_FE_CONTEXT:-../../sellgram-fe}
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* tertanam saat build: ubah nilai = wajib rebuild image
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://sellgram-api.coreapps.web.id}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://sellgram.coreapps.web.id}
+    image: sellgram-fe:local
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      NODE_OPTIONS: --max-old-space-size=256
+    ports: ["3000:3000"]
+    mem_limit: 320m
+    networks: [internal]
+
+  evolution:
+    # Di-pin ke versi yang terbukti jalan di lxc-4 (Fase 0: latest = 2.3.7). Jangan pakai latest (T4).
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    env_file: .env.evolution
+    environment:
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@postgres:5432/evolution_db
+      CACHE_REDIS_URI: redis://:${REDIS_PASSWORD}@redis:6379/2
+    volumes:
+      - evolution_instances:/evolution/instances
+    ports: ["8080:8080"]
+    mem_limit: 384m
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  postgres_data:
+  redis_data:
+  evolution_instances:
+    name: evolution_instances

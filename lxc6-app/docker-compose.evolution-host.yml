@@ -1,0 +1,35 @@
+# Overlay FALLBACK untuk T9 — dipakai HANYA jika Evolution gagal start di bridge network
+# (bug runc/sysctl pada LXC unprivileged). Di lxc-4 lama Evolution memang berjalan dengan
+# network_mode: host, jadi overlay ini jalur yang sudah terbukti.
+#
+# Pakai:
+#   docker compose -f docker-compose.yml -f docker-compose.evolution-host.yml up -d
+#
+# Konsekuensi:
+#  - Evolution mendengarkan 8080 langsung di network LXC (tidak ada port mapping).
+#  - Postgres & Redis harus bisa dijangkau dari host network → dipublish ke loopback saja.
+#  - Backend memanggil Evolution lewat host.docker.internal (di-map ke gateway host).
+#
+# Untuk kembali ke mode bridge: jalankan `up -d` dengan docker-compose.yml saja
+# (port loopback postgres/redis akan hilang dengan sendirinya).
+
+services:
+  evolution:
+    network_mode: host
+    networks: !reset []
+    ports: !reset []
+    environment:
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@127.0.0.1:5432/evolution_db
+      CACHE_REDIS_URI: redis://:${REDIS_PASSWORD}@127.0.0.1:6379/2
+
+  postgres:
+    ports: ["127.0.0.1:5432:5432"]
+
+  redis:
+    ports: ["127.0.0.1:6379:6379"]
+
+  backend:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      EVOLUTION_API_URL: http://host.docker.internal:8080

@@ -1,1 +1,10 @@
+# Rahasia — JANGAN commit
+.env
+.env.*
+!.env*.example
 
+# Kredensial pve-exporter (Fase 5)
+pve.yml
+
+# OS
+.DS_Store
