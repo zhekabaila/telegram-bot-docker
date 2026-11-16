@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: my_password
       POSTGRES_DB: db_telegram_bot
+      POSTGRES_EXTRA: CREATE DATABASE evolution_db;
     ports:
       - '5284:5432'
     volumes:
@@ -16,6 +17,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - '8081:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.evolution
+    volumes:
+      - evolution_instances:/evolution/instances
 
   redis:
     image: redis:7-alpine
@@ -85,3 +102,4 @@ volumes:
   redis_data:
   backend_node_modules:
   frontend_node_modules:
+  evolution_instances:

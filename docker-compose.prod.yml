@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: change_me
       POSTGRES_DB: db_telegram_bot
+      POSTGRES_EXTRA: CREATE DATABASE evolution_db;
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     healthcheck:
@@ -21,6 +22,30 @@ services:
           memory: 256M
         reservations:
           cpus: '0.1'
+          memory: 128M
+
+  evolution-api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api_prod
+    restart: unless-stopped
+    ports:
+      - '8081:8080'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env.evolution.prod
+    volumes:
+      - evolution_instances:/evolution/instances
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
           memory: 128M
 
   redis:
@@ -103,3 +128,4 @@ services:
 volumes:
   postgres_data_prod:
   redis_data_prod:
+  evolution_instances:
