@@ -17,6 +17,7 @@ Rencana lengkap: `PLAN-MIGRASI-LXC-DOCKER.md` di repo `caprover-setup`.
 lxc6-app/                        # stack aplikasi (Fase 1)
   docker-compose.yml
   docker-compose.evolution-host.yml   # overlay fallback T9 (Evolution network host)
+  docker-compose.local-image.yml      # overlay DARURAT: pakai image lokal Fase 3 (tanpa GHCR)
   .env.example                   # password compose-level
   .env.backend.example
   .env.evolution.example
@@ -160,6 +161,12 @@ sudo -u deploy /opt/deploy/deploy.sh be <sha>    # tag `sha-<sha>`
 
 Rollback = jalankan `deploy.sh` dengan tag lama, atau tulis `FE_TAG`/`BE_TAG` di `.env`
 lalu `docker compose up -d <svc>`.
+
+Bila GHCR tidak bisa dipakai sama sekali, pakai overlay image lokal Fase 3:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local-image.yml up -d backend frontend
+```
 
 ## Backup / restore
 

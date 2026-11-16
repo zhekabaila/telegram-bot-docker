@@ -1,0 +1,20 @@
+# Overlay DARURAT — kembali ke image hasil build lokal (Fase 3) tanpa GHCR.
+#
+# Dipakai HANYA bila image GHCR tidak bisa dipakai (paket privat / pipeline gagal)
+# dan Anda perlu menyalakan stack dengan image lama yang masih tersimpan di lxc-6:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local-image.yml up -d backend frontend
+#
+# `docker images | grep sellgram` harus masih menunjukkan `sellgram-be:local` dan
+# `sellgram-fe:local` (hasil build Fase 3). Bila image sudah terhapus, satu-satunya
+# jalan adalah build ulang dari source — lihat `legacy/` atau git history sebelum
+# commit Fase 6 (compose masih memakai `build:`).
+#
+# Untuk kembali ke GHCR: jalankan `up -d` hanya dengan docker-compose.yml.
+
+services:
+  backend:
+    image: sellgram-be:local
+
+  frontend:
+    image: sellgram-fe:local
