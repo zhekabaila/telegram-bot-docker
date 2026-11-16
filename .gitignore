@@ -6,5 +6,8 @@
 # Kredensial pve-exporter (Fase 5)
 pve.yml
 
+# Password admin Portainer (Fase 5) — hanya ada di server
+lxc7-monitoring/portainer/
+
 # OS
 .DS_Store

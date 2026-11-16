@@ -46,11 +46,16 @@ services:
   portainer:
     image: portainer/portainer-ce:2.45.3
     restart: unless-stopped
+    # Admin pertama dibuat saat start dari file password (bukan lewat UI 5 menit).
+    # File ./portainer/admin_password hanya ada di server (chmod 600, tidak di git).
+    command:
+      - --admin-password-file=/run/secrets/portainer_admin_password
     ports:
       - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
+      - ./portainer/admin_password:/run/secrets/portainer_admin_password:ro
     mem_limit: 128m
     networks: [mon]
 
