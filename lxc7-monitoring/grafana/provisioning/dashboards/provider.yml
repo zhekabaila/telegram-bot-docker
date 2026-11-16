@@ -1,0 +1,21 @@
+# Provider dashboard — Fase 5
+# File JSON di /var/lib/grafana/dashboards (mount ./grafana/dashboards).
+# Sumber dashboard (dicek 16 Nov 2026):
+#   1860  Node Exporter Full          -> node-exporter-full.json
+#   10347 Proxmox via Prometheus      -> proxmox-via-prometheus.json
+#   14282 cAdvisor exporter           -> cadvisor-exporter.json
+#   7587  Prometheus Blackbox Exporter-> blackbox-exporter.json
+
+apiVersion: 1
+
+providers:
+  - name: sellgram
+    orgId: 1
+    folder: Sellgram
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

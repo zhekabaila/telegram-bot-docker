@@ -1,0 +1,79 @@
+# Stack monitoring di lxc-7 (10.0.2.26) — Fase 5
+#
+# Jalankan dari direktori ini:  docker compose up -d
+# Prasyarat:
+#   1. .env berisi GRAFANA_ADMIN_PASSWORD (lihat .env.example), chmod 600
+#   2. pve-exporter/pve.yml berisi token API Proxmox, chmod 600, TIDAK di git
+#
+# Prometheus, pve-exporter, dan blackbox TIDAK dipublish ke host:
+# hanya dijangkau lewat network internal `mon`. Yang punya port host hanya
+# Grafana (3000) dan Portainer (9443) karena keduanya diakses via Cloudflare Tunnel.
+
+name: monitoring
+
+services:
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=1GB
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    mem_limit: 384m
+    networks: [mon]
+
+  grafana:
+    image: grafana/grafana:13.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?isi GRAFANA_ADMIN_PASSWORD di .env}
+      GF_SERVER_ROOT_URL: https://grafana.coreapps.web.id
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    mem_limit: 256m
+    networks: [mon]
+
+  portainer:
+    image: portainer/portainer-ce:2.45.3
+    restart: unless-stopped
+    ports:
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    mem_limit: 128m
+    networks: [mon]
+
+  pve-exporter:
+    image: prompve/prometheus-pve-exporter:3.11.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/pve.yml
+    volumes:
+      - ./pve-exporter/pve.yml:/etc/prometheus/pve.yml:ro
+    mem_limit: 64m
+    networks: [mon]
+
+  blackbox:
+    image: prom/blackbox-exporter:v0.29.1
+    restart: unless-stopped
+    mem_limit: 48m
+    networks: [mon]
+
+networks:
+  mon:
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  portainer_data:

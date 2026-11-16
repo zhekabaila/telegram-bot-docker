@@ -1,0 +1,16 @@
+# Datasource Prometheus untuk Grafana — Fase 5
+# uid "prometheus" dipakai oleh dashboard yang di-provision di folder ../dashboards
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 30s

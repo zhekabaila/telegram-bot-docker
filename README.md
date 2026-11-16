@@ -25,7 +25,13 @@ scripts/
   backup-db.sh
   restore-db.sh
 legacy/                          # arsip stack lama (compose prod, Dockerfile, docs, skill VPS)
-lxc7-monitoring/                 # menyusul di Fase 5
+lxc7-monitoring/                 # stack monitoring lxc-7 (Fase 5)
+  docker-compose.yml             # prometheus, grafana, portainer, pve-exporter, blackbox
+  prometheus/prometheus.yml
+  pve-exporter/pve.yml.example   # token asli hanya di server (pve.yml, chmod 600)
+  grafana/provisioning/          # datasource + provider dashboard
+  grafana/dashboards/            # 1860, 10347, 14282, 7587 (sudah diproses)
+lxc6-app/docker-compose.agents.yml  # node-exporter, cAdvisor, portainer-agent (Fase 5)
 ```
 
 ## Port
@@ -37,6 +43,12 @@ lxc7-monitoring/                 # menyusul di Fase 5
 | evolution | 8080 | API key wajib di header `apikey` |
 | postgres | — | **tidak dipublish** (hanya network internal) |
 | redis | — | **tidak dipublish** (hanya network internal) |
+| cAdvisor (agent) | 8082 | Fase 5, di lxc-6 |
+| portainer-agent | 9001 | Fase 5, di lxc-6 |
+| node-exporter | 9100 | Fase 5, `network_mode: host` di lxc-6 |
+| Grafana (lxc-7) | 3000 | Fase 5 |
+| Portainer (lxc-7) | 9443 | HTTPS, target tunnel pakai *No TLS Verify* |
+| Prometheus (lxc-7) | — | **tidak dipublish**, hanya network `mon` |
 
 Postgres/Redis sengaja tidak terbuka. Kalau Evolution harus pindah ke `network_mode: host`,
 keduanya dipublish **ke loopback saja** oleh overlay (lihat di bawah).
@@ -129,7 +141,33 @@ Kembali ke bridge: `docker compose up -d` (tanpa overlay).
 skill deploy VPS) untuk referensi. **Jangan dipakai untuk lxc-6** — port, build, dan env-nya
 sudah tidak sesuai (T11, T13).
 
+## Monitoring (Fase 5)
+
+Agent di **lxc-6**, server di **lxc-7**.
+
+```bash
+# lxc-6 — overlay agent (project tetap "sellgram")
+cd /opt/sellgram/telegram-bot-docker/lxc6-app
+docker compose -f docker-compose.yml -f docker-compose.agents.yml up -d
+
+# lxc-7 — stack monitoring
+cd /opt/monitoring
+cp .env.example .env && chmod 600 .env       # isi GRAFANA_ADMIN_PASSWORD
+cp pve-exporter/pve.yml.example pve-exporter/pve.yml && chmod 600 pve-exporter/pve.yml
+docker compose up -d
+```
+
+Versi image di-pin (bukan `latest`): node-exporter `v1.12.1`, cAdvisor `v0.60.6`,
+portainer-ce/agent `2.45.3`, prometheus `v3.15.1`, grafana `13.3.0`,
+pve-exporter `3.11.0`, blackbox `v0.29.1`.
+
+Dashboard (provisioning, folder **Sellgram**): 1860 Node Exporter Full,
+10347 Proxmox via Prometheus, 14282 cAdvisor exporter, 7587 Blackbox Exporter.
+
+Token Proxmox: user `monitor@pve` + role `PVEAuditor` + API token `prom`
+(`--privsep 0`). Nilainya **hanya** di `lxc7-monitoring/pve-exporter/pve.yml` di server.
+
 ## Status fase
 
 - Fase 1 (repo ini) — selesai: compose lxc-6, initdb, env contoh, script, `.gitignore`.
-- Fase 5 — akan menambah `lxc7-monitoring/` dan `docker-compose.agents.yml`.
+- Fase 5 — selesai: `lxc7-monitoring/` + `lxc6-app/docker-compose.agents.yml`.

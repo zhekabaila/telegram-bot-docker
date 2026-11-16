@@ -1,0 +1,13 @@
+# Contoh konfigurasi pve-exporter — SALIN ke pve.yml lalu isi token asli.
+#
+#   cp pve.yml.example pve.yml && chmod 600 pve.yml
+#
+# pve.yml TIDAK di-commit (lihat .gitignore). Token dibuat di host Proxmox:
+#   pveum user token add monitor@pve prom --privsep 0
+# User monitor@pve memakai role PVEAuditor (read-only) di path /.
+
+default:
+  user: monitor@pve
+  token_name: prom
+  token_value: GANTI_DENGAN_TOKEN_VALUE
+  verify_ssl: false

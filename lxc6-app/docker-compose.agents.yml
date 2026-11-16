@@ -1,0 +1,50 @@
+# Agent monitoring untuk lxc-6 (10.0.2.25) — Fase 5
+#
+# Dijalankan sebagai OVERLAY di atas stack aplikasi (project name tetap "sellgram"):
+#   docker compose -f docker-compose.yml -f docker-compose.agents.yml up -d
+# Jangan dijalankan sendirian: file ini tidak mendefinisikan postgres/redis/backend.
+#
+# Port yang dipakai (T11): cAdvisor 8082 (8080 milik Evolution), portainer-agent 9001,
+# node-exporter 9100 (network host).
+# Scraper-nya ada di lxc-7 (10.0.2.26): lihat lxc7-monitoring/prometheus/prometheus.yml.
+
+services:
+  # Metrik host-LXC (CPU, RAM, disk, network) — dibaca Prometheus dari 10.0.2.25:9100
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    restart: unless-stopped
+    pid: host
+    network_mode: host
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|var/lib/docker/.+)($|/)
+    volumes:
+      - /:/host:ro,rslave
+    mem_limit: 48m
+
+  # Metrik per container. Di LXC unprivileged sebagian metrik cgroup bisa kosong;
+  # dalam kondisi itu andalkan pve-exporter + `docker stats`/Portainer (lihat plan 5B).
+  cadvisor:
+    image: ghcr.io/google/cadvisor/cadvisor:v0.60.6
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    mem_limit: 128m
+    networks: [internal]
+
+  # Agent agar Portainer di lxc-7 bisa mengelola Docker lxc-6
+  portainer-agent:
+    image: portainer/agent:2.45.3
+    restart: unless-stopped
+    ports:
+      - "9001:9001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    mem_limit: 64m
+    networks: [internal]
