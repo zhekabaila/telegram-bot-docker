@@ -1,6 +1,9 @@
 # Contoh konfigurasi pve-exporter — SALIN ke pve.yml lalu isi token asli.
 #
 #   cp pve.yml.example pve.yml && chmod 600 pve.yml
+#   sudo chown 101:101 pve.yml    # container berjalan sebagai user `prometheus` (uid 101)
+#
+# Tanpa chown itu pve-exporter gagal start: PermissionError /etc/prometheus/pve.yml.
 #
 # pve.yml TIDAK di-commit (lihat .gitignore). Token dibuat di host Proxmox:
 #   pveum user token add monitor@pve prom --privsep 0

@@ -154,6 +154,7 @@ docker compose -f docker-compose.yml -f docker-compose.agents.yml up -d
 cd /opt/monitoring
 cp .env.example .env && chmod 600 .env       # isi GRAFANA_ADMIN_PASSWORD
 cp pve-exporter/pve.yml.example pve-exporter/pve.yml && chmod 600 pve-exporter/pve.yml
+sudo chown 101:101 pve-exporter/pve.yml          # user `prometheus` di image pve-exporter
 docker compose up -d
 ```
 
