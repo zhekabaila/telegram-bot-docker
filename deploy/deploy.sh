@@ -27,6 +27,11 @@
 
 set -uo pipefail
 
+# Docker mencari plugin (compose) lewat $HOME — pastikan tidak kosong/terwarisi
+# dari root saat skrip dijalankan lewat sudo tanpa -H.
+export HOME="${HOME:-/home/deploy}"
+if [ ! -d "$HOME" ] || [ "$HOME" = "/root" ]; then HOME=/home/deploy; export HOME; fi
+
 SERVICE="${1:-}"
 COMMIT="${2:-}"
 

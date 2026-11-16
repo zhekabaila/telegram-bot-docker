@@ -9,6 +9,7 @@ Requires=docker.service
 Type=simple
 User=deploy
 Group=deploy
+Environment=HOME=/home/deploy
 WorkingDirectory=/opt/deploy
 ExecStart=/usr/local/bin/webhook -hooks /etc/webhook/hooks.json -port 9000 -verbose -hotreload
 Restart=always
