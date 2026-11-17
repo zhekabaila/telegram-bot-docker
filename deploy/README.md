@@ -33,7 +33,7 @@ berhasil. Karena itu hook deploy hanya **memicu** lalu langsung balas
 | File | Tujuan di server |
 |---|---|
 | `deploy.sh` | `/opt/deploy/deploy.sh` (mode 750, milik `deploy`) — logika deploy + rollback |
-| `deploy-start.sh` | `/opt/deploy/deploy-start.sh` — penerima hook deploy, menjalankan `deploy.sh` di background |
+| `deploy-start.sh` | `/opt/deploy/deploy-start.sh` — penerima hook deploy, menjalankan `deploy.sh` di background + lock per service (`state/<svc>.lock`, duplikat dibalas `already-running`) |
 | `deploy-status.sh` | `/opt/deploy/deploy-status.sh` — penerima hook status, mencetak isi `state/<svc>.status` |
 | `hooks.json.example` | dasar `/etc/webhook/hooks.json` — `__DEPLOY_TOKEN__` diganti token asli (4 hook) |
 | `webhook.service` | `/etc/systemd/system/webhook.service` |
@@ -107,6 +107,10 @@ Status deploy (`/opt/deploy/state/<svc>.status`) berisi
 `STATE=DEPLOY_RUNNING|DEPLOY_OK|DEPLOY_FAILED`, `TAG=`, `OLD_TAG=`, `PID=`,
 `UPDATED_AT=`, `MESSAGE=`. Bila skrip berhenti tak terduga, `trap EXIT` menulis
 `DEPLOY_FAILED` supaya CI tidak menunggu sampai timeout.
+
+`deploy-start.sh` menolak deploy ganda untuk service yang sama lewat lock
+`/opt/deploy/state/<svc>.lock` (dibalas `DEPLOY_STARTED ... already-running`),
+sedangkan `flock` di `deploy.sh` tetap menyerialkan fe vs be.
 
 Deploy manual (tanpa GitHub) — jalankan sebagai `deploy`:
 
