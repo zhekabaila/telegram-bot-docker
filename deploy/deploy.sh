@@ -11,6 +11,12 @@
 #   stdout memuat DEPLOY_OK     -> exit 0
 #   stdout memuat DEPLOY_FAILED -> exit 1 (termasuk bila sudah di-rollback)
 #
+# Skrip ini TIDAK dipanggil langsung oleh webhook: webhook memanggil
+# deploy-start.sh yang menjalankannya di background, karena `docker compose pull`
+# bisa berjalan >100 s dan Cloudflare memutus request tanpa output (~60 s).
+# Progres dibaca lewat hook /hooks/status-<svc> (status.sh) yang membaca
+# /opt/deploy/state/<svc>.status (STATE=DEPLOY_RUNNING|DEPLOY_OK|DEPLOY_FAILED).
+#
 # Alur:
 #   1. flock                      -> dua deploy tidak boleh bersamaan
 #   2. catat tag aktif (dari .env, cadangan state file)
@@ -34,6 +40,9 @@ if [ ! -d "$HOME" ] || [ "$HOME" = "/root" ]; then HOME=/home/deploy; export HOM
 
 SERVICE="${1:-}"
 COMMIT="${2:-}"
+# Catatan: skrip ini dipanggil oleh deploy-start.sh (async) atau langsung manual.
+# Durasi deploy bisa >2 menit, jadi TIDAK boleh dijalankan di dalam satu request
+# HTTP yang ditahan (Cloudflare memutus koneksi ~60 s saat tanpa output).
 
 COMPOSE_DIR="${COMPOSE_DIR:-/opt/sellgram/telegram-bot-docker/lxc6-app}"
 STATE_DIR="${STATE_DIR:-/opt/deploy/state}"
@@ -41,6 +50,7 @@ LOCK_FILE="${LOCK_FILE:-/opt/deploy/deploy.lock}"
 LOG_FILE="${LOG_FILE:-/opt/deploy/deploy.log}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-40}"
 HEALTH_URL="${HEALTH_URL:-}"
+STATUS_FILE="${STATUS_FILE:-}"
 
 case "$SERVICE" in
   fe) COMPOSE_SVC="frontend"; TAG_VAR="FE_TAG"; DEFAULT_HEALTH="http://127.0.0.1:3000/" ;;
@@ -49,6 +59,7 @@ case "$SERVICE" in
 esac
 HEALTH_URL="${HEALTH_URL:-$DEFAULT_HEALTH}"
 STATE_FILE="$STATE_DIR/${SERVICE}.tag"
+STATUS_FILE="${STATUS_FILE:-$STATE_DIR/${SERVICE}.status}"
 
 # --- validasi commit: hanya hex, agar tidak bisa menyuntik nilai ke .env / nama image
 if [ -n "$COMMIT" ] && ! printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then
@@ -63,6 +74,28 @@ mkdir -p "$STATE_DIR" "$(dirname "$LOG_FILE")" 2>/dev/null \
 # Semua keluaran -> stdout (dibaca webhook / GitHub Actions) + file log.
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "===== $(date -u '+%Y-%m-%dT%H:%M:%SZ') deploy service=${SERVICE} tag=${NEW_TAG} ====="
+
+# --- status file (dipoll hook /hooks/status-<svc>) -------------------------
+# DEPLOY_RUNNING -> DEPLOY_OK | DEPLOY_FAILED. Ditulis atomik (tmp + mv) supaya
+# pembaca tidak pernah melihat file setengah jadi.
+status_write() {  # $1 = state, $2 = pesan
+  local tmp="$STATUS_FILE.tmp"
+  {
+    printf 'STATE=%s\n' "$1"
+    printf 'SERVICE=%s\n' "$SERVICE"
+    printf 'TAG=%s\n' "${NEW_TAG:-}"
+    printf 'OLD_TAG=%s\n' "${OLD_TAG:-}"
+    printf 'PID=%s\n' "$$"
+    printf 'UPDATED_AT=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf 'MESSAGE=%s\n' "${2:-}"
+  } > "$tmp" 2>/dev/null && mv "$tmp" "$STATUS_FILE" 2>/dev/null
+}
+
+# Jangan pernah meninggalkan status DEPLOY_RUNNING bila skrip berhenti karena
+# sebab tak terduga — CI akan menunggu sampai timeout.
+FINAL_STATE=""
+trap 'rc=$?; if [ -z "${FINAL_STATE:-}" ]; then status_write DEPLOY_FAILED "berhenti tak terduga (exit ${rc})"; fi' EXIT
+status_write DEPLOY_RUNNING "memulai ${NEW_TAG}"
 
 # --- 1. flock: satu deploy pada satu waktu ---------------------------------
 exec 9>"$LOCK_FILE" || { echo "DEPLOY_FAILED tidak bisa membuka lock file"; exit 1; }
@@ -123,8 +156,10 @@ container_running() {
 
 rollback() {  # $1 = alasan
   echo "[rollback] alasan: $1"
+  FINAL_STATE="DEPLOY_FAILED"
   if [ -z "${OLD_TAG:-}" ] || [ "$OLD_TAG" = "$NEW_TAG" ]; then
     echo "[rollback] TIDAK BISA: tidak ada tag sebelumnya yang berbeda (deploy pertama?)"
+    status_write DEPLOY_FAILED "$1; tidak ada tag sebelumnya untuk rollback"
     echo "DEPLOY_FAILED"
     exit 1
   fi
@@ -134,8 +169,10 @@ rollback() {  # $1 = alasan
   docker compose up -d "$COMPOSE_SVC"       || echo "[rollback] up -d gagal"
   if wait_healthy "$HEALTH_TIMEOUT"; then
     echo "[rollback] service kembali sehat pada tag ${OLD_TAG}"
+    status_write DEPLOY_FAILED "$1; rollback ke ${OLD_TAG} berhasil"
   else
     echo "[rollback] PERINGATAN: service tetap tidak sehat, perlu tindakan manual"
+    status_write DEPLOY_FAILED "$1; rollback ke ${OLD_TAG} GAGAL, perlu tindakan manual"
   fi
   echo "DEPLOY_FAILED"
   exit 1
@@ -174,6 +211,8 @@ fi
 
 # --- 7. sukses -------------------------------------------------------------
 printf '%s\n' "$NEW_TAG" > "$STATE_FILE" && chmod 600 "$STATE_FILE"
+FINAL_STATE="DEPLOY_OK"
+status_write DEPLOY_OK "sukses pada ${NEW_TAG}"
 echo "[deploy] SUKSES: ${SERVICE} (${COMPOSE_SVC}) -> ${NEW_TAG}"
 echo "DEPLOY_OK"
 exit 0

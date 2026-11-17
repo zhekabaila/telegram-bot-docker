@@ -1,8 +1,8 @@
 [
   {
     "id": "deploy-fe",
-    "execute-command": "/opt/deploy/deploy.sh",
-    "command-working-directory": "/opt/sellgram/telegram-bot-docker/lxc6-app",
+    "execute-command": "/opt/deploy/deploy-start.sh",
+    "command-working-directory": "/opt/deploy",
     "include-command-output-in-response": true,
     "include-command-output-in-response-on-error": true,
     "http-methods": ["POST"],
@@ -31,8 +31,8 @@
   },
   {
     "id": "deploy-be",
-    "execute-command": "/opt/deploy/deploy.sh",
-    "command-working-directory": "/opt/sellgram/telegram-bot-docker/lxc6-app",
+    "execute-command": "/opt/deploy/deploy-start.sh",
+    "command-working-directory": "/opt/deploy",
     "include-command-output-in-response": true,
     "include-command-output-in-response-on-error": true,
     "http-methods": ["POST"],
@@ -40,6 +40,60 @@
       { "source": "string", "name": "be" },
       { "source": "payload", "name": "sha" }
     ],
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "__DEPLOY_TOKEN__",
+            "parameter": { "source": "header", "name": "X-Deploy-Token" }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "be",
+            "parameter": { "source": "payload", "name": "service" }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "status-fe",
+    "execute-command": "/opt/deploy/deploy-status.sh",
+    "command-working-directory": "/opt/deploy",
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "http-methods": ["POST"],
+    "pass-arguments-to-command": [{ "source": "string", "name": "fe" }],
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "__DEPLOY_TOKEN__",
+            "parameter": { "source": "header", "name": "X-Deploy-Token" }
+          }
+        },
+        {
+          "match": {
+            "type": "value",
+            "value": "fe",
+            "parameter": { "source": "payload", "name": "service" }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "status-be",
+    "execute-command": "/opt/deploy/deploy-status.sh",
+    "command-working-directory": "/opt/deploy",
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "http-methods": ["POST"],
+    "pass-arguments-to-command": [{ "source": "string", "name": "be" }],
     "trigger-rule": {
       "and": [
         {
