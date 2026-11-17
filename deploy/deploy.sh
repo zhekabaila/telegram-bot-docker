@@ -22,7 +22,7 @@
 #   2. catat tag aktif (dari .env, cadangan state file)
 #   3. tulis tag baru ke .env     -> compose membaca ${BE_TAG}/${FE_TAG}
 #   4. docker compose pull <svc>  -> gagal = tag dikembalikan, container lama tetap jalan
-#   5. docker compose up -d <svc>
+#   5. docker compose up -d --force-recreate <svc>
 #   6. health check 40 detik
 #   7. sehat    : simpan tag baru, cetak DEPLOY_OK
 #      tidak    : kembalikan tag lama + up -d ulang, cetak DEPLOY_FAILED
@@ -166,7 +166,10 @@ rollback() {  # $1 = alasan
   echo "[rollback] ${NEW_TAG} -> ${OLD_TAG}"
   write_tag "$OLD_TAG" || { echo "DEPLOY_FAILED gagal menulis .env saat rollback"; exit 1; }
   docker compose pull "$COMPOSE_SVC" || echo "[rollback] pull gagal, coba image yang sudah ada di lokal"
-  docker compose up -d "$COMPOSE_SVC"       || echo "[rollback] up -d gagal"
+  # --force-recreate: compose tidak membuat ulang container bila nama tag sama
+  # walau isi image di registry sudah berubah (mis. workflow dijalankan ulang
+  # untuk commit yang sama), sehingga build baru tidak akan pernah dipakai.
+  docker compose up -d --force-recreate "$COMPOSE_SVC" || echo "[rollback] up -d gagal"
   if wait_healthy "$HEALTH_TIMEOUT"; then
     echo "[rollback] service kembali sehat pada tag ${OLD_TAG}"
     status_write DEPLOY_FAILED "$1; rollback ke ${OLD_TAG} berhasil"
@@ -195,8 +198,8 @@ if ! docker compose pull "$COMPOSE_SVC"; then
 fi
 
 # --- 5. up -d --------------------------------------------------------------
-echo "[deploy] docker compose up -d ${COMPOSE_SVC}"
-if ! docker compose up -d "$COMPOSE_SVC"; then
+echo "[deploy] docker compose up -d --force-recreate ${COMPOSE_SVC}"
+if ! docker compose up -d --force-recreate "$COMPOSE_SVC"; then
   rollback "docker compose up -d gagal"
 fi
 

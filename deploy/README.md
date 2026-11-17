@@ -88,7 +88,7 @@ deploy.sh <fe|be> [sha]      # sha = commit penuh -> tag sha-<sha>; tanpa sha ->
 |---|---|
 | `flock -w 300` | `DEPLOY_FAILED` (deploy lain sedang jalan) |
 | `docker compose pull <svc>` | tag di `.env` dikembalikan, container lama **tidak** disentuh |
-| `docker compose up -d <svc>` | rollback ke tag sebelumnya |
+| `docker compose up -d --force-recreate <svc>` | rollback ke tag sebelumnya |
 | health check 40 s | rollback ke tag sebelumnya + `up -d` ulang |
 | container tidak `running` | rollback |
 | semua lulus | tulis `state/<svc>.tag`, `state/<svc>.status` = `DEPLOY_OK`, cetak `DEPLOY_OK` |
@@ -102,6 +102,10 @@ Health check:
 
 Tag aktif disimpan di dua tempat: `.env` (`FE_TAG`/`BE_TAG`, dibaca compose) dan
 `/opt/deploy/state/{fe,be}.tag` (audit). Log: `/opt/deploy/deploy.log`.
+
+`up -d` selalu memakai `--force-recreate`: compose **tidak** membuat ulang container
+bila nama tag sama walau isi image di registry berubah (workflow dijalankan ulang
+untuk commit yang sama), sehingga build baru tidak akan pernah dipakai.
 
 Status deploy (`/opt/deploy/state/<svc>.status`) berisi
 `STATE=DEPLOY_RUNNING|DEPLOY_OK|DEPLOY_FAILED`, `TAG=`, `OLD_TAG=`, `PID=`,
