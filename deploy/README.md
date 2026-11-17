@@ -42,6 +42,9 @@ install -d -o deploy -g deploy -m 755 /opt/deploy /opt/deploy/state /etc/webhook
 install -m 0644 deploy/hooks.json.example /etc/webhook/hooks.json
 sed -i "s|__DEPLOY_TOKEN__|$(cat /tmp/deploy-token.txt)|g" /etc/webhook/hooks.json
 chmod 600 /etc/webhook/hooks.json && rm -f /tmp/deploy-token.txt
+# WAJIB: webhook berjalan sebagai `deploy`, jadi file harus bisa dibaca `deploy`
+# (mode 600 root:root membuat webhook memuat 0 hook -> "Hook not found." pada semua request)
+chown deploy:deploy /etc/webhook/hooks.json
 
 # 4. skrip + unit
 install -o deploy -g deploy -m 0750 deploy/deploy.sh /opt/deploy/deploy.sh

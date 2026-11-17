@@ -11,6 +11,9 @@ User=deploy
 Group=deploy
 Environment=HOME=/home/deploy
 WorkingDirectory=/opt/deploy
+# Gagal keras bila hooks.json tidak bisa dibaca user deploy. Tanpa guard ini
+# webhook tetap "active" dengan 0 hook dan semua request berbalas "Hook not found."
+ExecStartPre=/usr/bin/test -r /etc/webhook/hooks.json
 ExecStart=/usr/local/bin/webhook -hooks /etc/webhook/hooks.json -port 9000 -verbose -hotreload
 Restart=always
 RestartSec=5
